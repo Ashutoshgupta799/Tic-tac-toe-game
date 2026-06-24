@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --panel: #12121a;
+    --border: #1e1e2e;
+    --x-color: #ff4d6d;
+    --o-color: #4cc9f0;
+    --grid-line: #1e1e2e;
+    --glow-x: rgba(255,77,109,0.35);
+    --glow-o: rgba(76,201,240,0.35);
+    --text: #e0e0f0;
+    --muted: #555577;
+    --win-flash: #ffe066;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(76,201,240,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(76,201,240,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridDrift 20s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  @keyframes gridDrift {
+    0% { background-position: 0 0; }
+    100% { background-position: 40px 40px; }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    padding: 24px 16px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+  }
+
+  .title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.8rem, 8vw, 5rem);
+    letter-spacing: 6px;
+    background: linear-gradient(135deg, var(--x-color), var(--o-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    filter: drop-shadow(0 0 20px rgba(76,201,240,0.3));
+  }
+
+  .subtitle {
+    font-size: 0.65rem;
+    letter-spacing: 4px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Scoreboard */
+  .scoreboard {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .score-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 20px;
+    text-align: center;
+    min-width: 80px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .score-card.x-card { border-color: rgba(255,77,109,0.3); }
+  .score-card.o-card { border-color: rgba(76,201,240,0.3); }
+  .score-card.active-x { box-shadow: 0 0 20px var(--glow-x); border-color: var(--x-color); }
+  .score-card.active-o { box-shadow: 0 0 20px var(--glow-o); border-color: var(--o-color); }
+
+  .score-label {
+    font-size: 0.6rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .score-label.x { color: var(--x-color); }
+  .score-label.o { color: var(--o-color); }
+
+  .score-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    line-height: 1;
+    margin-top: 2px;
+  }
+
+  .score-divider {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    color: var(--muted);
+    padding: 0 4px;
+  }
+
+  .draws-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    text-align: center;
+  }
+
+  .draws-label {
+    font-size: 0.55rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .draws-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    color: var(--muted);
+    line-height: 1;
+  }
+
+  /* Status bar */
+  .status {
+    font-size: 0.75rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    height: 20px;
+    transition: all 0.3s;
+    text-align: center;
+  }
+
+  .status.x-turn { color: var(--x-color); }
+  .status.o-turn { color: var(--o-color); }
+  .status.winner { color: var(--win-flash); animation: pulse 0.8s ease-in-out infinite alternate; }
+  .status.draw { color: var(--muted); }
+
+  @keyframes pulse {
+    from { opacity: 0.7; }
+    to { opacity: 1; filter: drop-shadow(0 0 6px var(--win-flash)); }
+  }
+
+  /* Game board */
+  .board-wrap {
+    position: relative;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    position: relative;
+  }
+
+  /* Grid lines using pseudo-elements */
+  .grid-lines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .grid-lines::before,
+  .grid-lines::after {
+    content: '';
+    position: absolute;
+    background: var(--grid-line);
+  }
+
+  /* Vertical lines */
+  .vline {
+    position: absolute;
+    width: 2px;
+    top: 8px;
+    bottom: 8px;
+    background: linear-gradient(to bottom, transparent, var(--muted), transparent);
+  }
+  .vline-1 { left: calc(33.33% - 1px); }
+  .vline-2 { left: calc(66.66% - 1px); }
+
+  /* Horizontal lines */
+  .hline {
+    position: absolute;
+    height: 2px;
+    left: 8px;
+    right: 8px;
+    background: linear-gradient(to right, transparent, var(--muted), transparent);
+  }
+  .hline-1 { top: calc(33.33% - 1px); }
+  .hline-2 { top: calc(66.66% - 1px); }
+
+  /* Cells */
+  .cell {
+    width: clamp(90px, 22vw, 130px);
+    height: clamp(90px, 22vw, 130px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+  }
+
+  .cell:hover:not(.taken) {
+    background: rgba(255,255,255,0.03);
+  }
+
+  .cell.taken { cursor: default; }
+
+  .cell-inner {
+    width: 60%;
+    height: 60%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* X mark */
+  .mark-x {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .mark-x::before,
+  .mark-x::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, var(--x-color), #ff8fa3);
+    border-radius: 2px;
+    top: 50%;
+    left: 0;
+    box-shadow: 0 0 12px var(--glow-x);
+  }
+
+  .mark-x::before { transform: translateY(-50%) rotate(45deg); }
+  .mark-x::after  { transform: translateY(-50%) rotate(-45deg); }
+
+  /* O mark (SVG circle drawn with stroke-dasharray animation) */
+  .mark-o {
+    width: 100%;
+    height: 100%;
+    animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .mark-o svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .mark-o circle {
+    fill: none;
+    stroke: var(--o-color);
+    stroke-width: 4px;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px var(--glow-o));
+    stroke-dasharray: 157;
+    stroke-dashoffset: 157;
+    animation: drawCircle 0.4s ease-out forwards;
+  }
+
+  @keyframes drawCircle {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* Hover ghost marks */
+  .cell:not(.taken):hover .ghost-x,
+  .cell:not(.taken):hover .ghost-o {
+    display: flex;
+  }
+
+  .ghost-x, .ghost-o {
+    display: none;
+    width: 60%;
+    height: 60%;
+    position: absolute;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.2;
+    pointer-events: none;
+  }
+
+  .ghost-x-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+  .ghost-x-inner::before, .ghost-x-inner::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 4px;
+    background: var(--x-color);
+    border-radius: 2px;
+    top: 50%;
+    left: 0;
+  }
+  .ghost-x-inner::before { transform: translateY(-50%) rotate(45deg); }
+  .ghost-x-inner::after  { transform: translateY(-50%) rotate(-45deg); }
+
+  .ghost-o-inner {
+    width: 100%;
+    height: 100%;
+  }
+  .ghost-o-inner svg { width: 100%; height: 100%; }
+  .ghost-o-inner circle { fill: none; stroke: var(--o-color); stroke-width: 4px; }
+
+  /* Win line overlay */
+  .win-line {
+    position: absolute;
+    background: var(--win-flash);
+    border-radius: 3px;
+    box-shadow: 0 0 20px var(--win-flash), 0 0 40px rgba(255,224,102,0.4);
+    z-index: 10;
+    transform-origin: left center;
+    animation: winDraw 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    pointer-events: none;
+  }
+
+  @keyframes winDraw {
+    from { transform: scaleX(0); opacity: 0; }
+    to { transform: scaleX(1); opacity: 1; }
+  }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 10px 24px;
+    border-radius: 6px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+  }
+
+  .btn-restart {
+    color: var(--o-color);
+    border-color: rgba(76,201,240,0.4);
+  }
+  .btn-restart:hover {
+    background: rgba(76,201,240,0.1);
+    border-color: var(--o-color);
+    box-shadow: 0 0 16px var(--glow-o);
+  }
+
+  .btn-reset {
+    color: var(--muted);
+    border-color: var(--border);
+  }
+  .btn-reset:hover {
+    color: var(--x-color);
+    border-color: rgba(255,77,109,0.4);
+    background: rgba(255,77,109,0.07);
+    box-shadow: 0 0 16px var(--glow-x);
+  }
+
+  /* Mode toggle */
+  .mode-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .mode-label {
+    font-size: 0.55rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .toggle-wrap {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .toggle-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+
+  .toggle-btn.active {
+    background: rgba(76,201,240,0.15);
+    color: var(--o-color);
+  }
+
+  /* Winning cell highlight */
+  .cell.win-cell .mark-x,
+  .cell.win-cell .mark-o { filter: brightness(1.3); }
+
+  /* Board shake on invalid click */
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+  .shake { animation: shake 0.25s ease-in-out; }
+
+  /* Win overlay cells fade */
+  .cell.dim { opacity: 0.3; transition: opacity 0.4s; }
+  .cell.win-cell { opacity: 1 !important; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="title">TIC TAC TOE</div>
+    <div class="subtitle">Two Players &bull; One Board &bull; Zero Mercy</div>
+  </div>
+
+  <div class="mode-row">
+    <span class="mode-label">Mode</span>
+    <div class="toggle-wrap">
+      <button class="toggle-btn active" id="btn2p" onclick="setMode('2p')">2 Player</button>
+      <button class="toggle-btn" id="btnAI" onclick="setMode('ai')">vs AI</button>
+    </div>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-card x-card active-x" id="xCard">
+      <div class="score-label x">X</div>
+      <div class="score-num" id="xScore">0</div>
+    </div>
+    <div class="score-divider">vs</div>
+    <div class="score-card o-card" id="oCard">
+      <div class="score-label o">O</div>
+      <div class="score-num" id="oScore">0</div>
+    </div>
+    <div class="draws-card">
+      <div class="draws-label">Draws</div>
+      <div class="draws-num" id="drawScore">0</div>
+    </div>
+  </div>
+
+  <div class="status x-turn" id="status">X's turn</div>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="grid-lines">
+      <div class="vline vline-1"></div>
+      <div class="vline vline-2"></div>
+      <div class="hline hline-1"></div>
+      <div class="hline hline-2"></div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-restart" onclick="restartGame()">New Game</button>
+    <button class="btn btn-reset" onclick="resetAll()">Reset Scores</button>
+  </div>
+</div>
+
+<script>
+  const WINS = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  let board = Array(9).fill(null);
+  let current = 'X';
+  let gameOver = false;
+  let scores = {X:0, O:0, D:0};
+  let mode = '2p'; // '2p' or 'ai'
+
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById('btn2p').classList.toggle('active', m==='2p');
+    document.getElementById('btnAI').classList.toggle('active', m==='ai');
+    resetAll();
+  }
+
+  function buildBoard() {
+    boardEl.innerHTML = '';
+    board.forEach((val, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (val ? ' taken' : '');
+      cell.dataset.i = i;
+
+      // Ghost hints
+      const ghostX = document.createElement('div');
+      ghostX.className = 'ghost-x';
+      ghostX.innerHTML = '<div class="ghost-x-inner"></div>';
+
+      const ghostO = document.createElement('div');
+      ghostO.className = 'ghost-o';
+      ghostO.innerHTML = `<div class="ghost-o-inner"><svg viewBox="0 0 50 50"><circle cx="25" cy="25" r="18"/></svg></div>`;
+
+      // Show correct ghost based on whose turn it is
+      if (!val && !gameOver) {
+        if (current === 'X') ghostX.style.display = 'flex';
+        else ghostO.style.display = 'flex';
+      }
+
+      const inner = document.createElement('div');
+      inner.className = 'cell-inner';
+
+      if (val === 'X') {
+        const m = document.createElement('div'); m.className = 'mark-x';
+        inner.appendChild(m);
+      } else if (val === 'O') {
+        const m = document.createElement('div'); m.className = 'mark-o';
+        m.innerHTML = `<svg viewBox="0 0 50 50"><circle cx="25" cy="25" r="18"/></svg>`;
+        inner.appendChild(m);
+      }
+
+      cell.appendChild(ghostX);
+      cell.appendChild(ghostO);
+      cell.appendChild(inner);
+      cell.addEventListener('click', () => handleClick(i));
+      boardEl.appendChild(cell);
+    });
+  }
+
+  function handleClick(i) {
+    if (gameOver || board[i]) {
+      if (board[i]) { boardEl.classList.add('shake'); setTimeout(()=>boardEl.classList.remove('shake'),300); }
+      return;
+    }
+    playMove(i);
+  }
+
+  function playMove(i) {
+    board[i] = current;
+    buildBoard();
+
+    const win = checkWin();
+    if (win) {
+      endGame(current, win);
+    } else if (board.every(Boolean)) {
+      endGame(null);
+    } else {
+      current = current === 'X' ? 'O' : 'X';
+      updateStatus();
+      // AI move
+      if (mode === 'ai' && current === 'O' && !gameOver) {
+        setTimeout(aiMove, 420);
+      }
+    }
+  }
+
+  function checkWin() {
+    for (const [a,b,c] of WINS) {
+      if (board[a] && board[a]===board[b] && board[a]===board[c]) return [a,b,c];
+    }
+    return null;
+  }
+
+  function endGame(winner, winCells) {
+    gameOver = true;
+    if (winner) {
+      scores[winner]++;
+      updateScores();
+      statusEl.textContent = `${winner} wins!`;
+      statusEl.className = 'status winner';
+      highlightWin(winCells);
+    } else {
+      scores.D++;
+      updateScores();
+      statusEl.textContent = "It's a draw!";
+      statusEl.className = 'status draw';
+    }
+  }
+
+  function highlightWin(cells) {
+    const allCells = boardEl.querySelectorAll('.cell');
+    allCells.forEach((c, i) => {
+      if (!cells.includes(i)) c.classList.add('dim');
+      else c.classList.add('win-cell');
+    });
+    drawWinLine(cells);
+  }
+
+  function drawWinLine(cells) {
+    const boardRect = boardEl.getBoundingClientRect();
+    const cellEls = boardEl.querySelectorAll('.cell');
+    const a = cellEls[cells[0]].getBoundingClientRect();
+    const c = cellEls[cells[2]].getBoundingClientRect();
+
+    const x1 = a.left + a.width/2 - boardRect.left;
+    const y1 = a.top + a.height/2 - boardRect.top;
+    const x2 = c.left + c.width/2 - boardRect.left;
+    const y2 = c.top + c.height/2 - boardRect.top;
+
+    const len = Math.hypot(x2-x1, y2-y1);
+    const angle = Math.atan2(y2-y1, x2-x1) * 180 / Math.PI;
+
+    const line = document.createElement('div');
+    line.className = 'win-line';
+    line.style.cssText = `
+      width: ${len}px; height: 4px;
+      left: ${x1}px; top: ${y1}px;
+      transform: rotate(${angle}deg) translateY(-50%);
+    `;
+    boardEl.parentElement.appendChild(line);
+  }
+
+  function updateStatus() {
+    const xCard = document.getElementById('xCard');
+    const oCard = document.getElementById('oCard');
+    if (current === 'X') {
+      statusEl.textContent = "X's turn";
+      statusEl.className = 'status x-turn';
+      xCard.classList.add('active-x');
+      oCard.classList.remove('active-o');
+    } else {
+      statusEl.textContent = mode==='ai' ? "AI is thinking…" : "O's turn";
+      statusEl.className = 'status o-turn';
+      oCard.classList.add('active-o');
+      xCard.classList.remove('active-x');
+    }
+  }
+
+  function updateScores() {
+    document.getElementById('xScore').textContent = scores.X;
+    document.getElementById('oScore').textContent = scores.O;
+    document.getElementById('drawScore').textContent = scores.D;
+  }
+
+  // --- AI (minimax) ---
+  function aiMove() {
+    if (gameOver) return;
+    const best = minimax(board, 'O');
+    playMove(best.index);
+  }
+
+  function minimax(b, player, depth=0) {
+    const win = getWinner(b);
+    if (win === 'O') return { score: 10 - depth };
+    if (win === 'X') return { score: depth - 10 };
+    const empty = b.map((v,i)=>v?null:i).filter(v=>v!==null);
+    if (!empty.length) return { score: 0 };
+
+    const moves = empty.map(i => {
+      const nb = [...b]; nb[i] = player;
+      const res = minimax(nb, player==='O'?'X':'O', depth+1);
+      return { index: i, score: res.score };
+    });
+
+    return player === 'O'
+      ? moves.reduce((a,b)=>b.score>a.score?b:a)
+      : moves.reduce((a,b)=>b.score<a.score?b:a);
+  }
+
+  function getWinner(b) {
+    for (const [a,bb,c] of WINS) {
+      if (b[a] && b[a]===b[bb] && b[a]===b[c]) return b[a];
+    }
+    return null;
+  }
+
+  // --- Controls ---
+  function restartGame() {
+    board = Array(9).fill(null);
+    current = 'X';
+    gameOver = false;
+    // Remove any win lines
+    boardEl.parentElement.querySelectorAll('.win-line').forEach(el=>el.remove());
+    updateStatus();
+    buildBoard();
+    const xCard = document.getElementById('xCard');
+    const oCard = document.getElementById('oCard');
+    xCard.classList.add('active-x');
+    oCard.classList.remove('active-o');
+  }
+
+  function resetAll() {
+    scores = {X:0,O:0,D:0};
+    updateScores();
+    restartGame();
+  }
+
+  // Init
+  buildBoard();
+  updateStatus();
+</script>
+</body>
+</html>

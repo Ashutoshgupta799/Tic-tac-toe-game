@@ -407,46 +407,6 @@
     box-shadow: 0 0 16px var(--glow-x);
   }
 
-  /* Mode toggle */
-  .mode-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .mode-label {
-    font-size: 0.55rem;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .toggle-wrap {
-    display: flex;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-  }
-
-  .toggle-btn {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.6rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    padding: 6px 14px;
-    border: none;
-    cursor: pointer;
-    background: transparent;
-    color: var(--muted);
-    transition: all 0.2s;
-  }
-
-  .toggle-btn.active {
-    background: rgba(76,201,240,0.15);
-    color: var(--o-color);
-  }
-
   /* Winning cell highlight */
   .cell.win-cell .mark-x,
   .cell.win-cell .mark-o { filter: brightness(1.3); }
@@ -470,14 +430,6 @@
   <div class="header">
     <div class="title">TIC TAC TOE</div>
     <div class="subtitle">Two Players &bull; One Board &bull; Zero Mercy</div>
-  </div>
-
-  <div class="mode-row">
-    <span class="mode-label">Mode</span>
-    <div class="toggle-wrap">
-      <button class="toggle-btn active" id="btn2p" onclick="setMode('2p')">2 Player</button>
-      <button class="toggle-btn" id="btnAI" onclick="setMode('ai')">vs AI</button>
-    </div>
   </div>
 
   <div class="scoreboard">
@@ -525,17 +477,9 @@
   let current = 'X';
   let gameOver = false;
   let scores = {X:0, O:0, D:0};
-  let mode = '2p'; // '2p' or 'ai'
 
   const boardEl = document.getElementById('board');
   const statusEl = document.getElementById('status');
-
-  function setMode(m) {
-    mode = m;
-    document.getElementById('btn2p').classList.toggle('active', m==='2p');
-    document.getElementById('btnAI').classList.toggle('active', m==='ai');
-    resetAll();
-  }
 
   function buildBoard() {
     boardEl.innerHTML = '';
@@ -599,10 +543,6 @@
     } else {
       current = current === 'X' ? 'O' : 'X';
       updateStatus();
-      // AI move
-      if (mode === 'ai' && current === 'O' && !gameOver) {
-        setTimeout(aiMove, 420);
-      }
     }
   }
 
@@ -671,7 +611,7 @@
       xCard.classList.add('active-x');
       oCard.classList.remove('active-o');
     } else {
-      statusEl.textContent = mode==='ai' ? "AI is thinking…" : "O's turn";
+      statusEl.textContent = "O's turn";
       statusEl.className = 'status o-turn';
       oCard.classList.add('active-o');
       xCard.classList.remove('active-x');
@@ -682,38 +622,6 @@
     document.getElementById('xScore').textContent = scores.X;
     document.getElementById('oScore').textContent = scores.O;
     document.getElementById('drawScore').textContent = scores.D;
-  }
-
-  // --- AI (minimax) ---
-  function aiMove() {
-    if (gameOver) return;
-    const best = minimax(board, 'O');
-    playMove(best.index);
-  }
-
-  function minimax(b, player, depth=0) {
-    const win = getWinner(b);
-    if (win === 'O') return { score: 10 - depth };
-    if (win === 'X') return { score: depth - 10 };
-    const empty = b.map((v,i)=>v?null:i).filter(v=>v!==null);
-    if (!empty.length) return { score: 0 };
-
-    const moves = empty.map(i => {
-      const nb = [...b]; nb[i] = player;
-      const res = minimax(nb, player==='O'?'X':'O', depth+1);
-      return { index: i, score: res.score };
-    });
-
-    return player === 'O'
-      ? moves.reduce((a,b)=>b.score>a.score?b:a)
-      : moves.reduce((a,b)=>b.score<a.score?b:a);
-  }
-
-  function getWinner(b) {
-    for (const [a,bb,c] of WINS) {
-      if (b[a] && b[a]===b[bb] && b[a]===b[c]) return b[a];
-    }
-    return null;
   }
 
   // --- Controls ---
